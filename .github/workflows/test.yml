@@ -1,0 +1,119 @@
+name: plugdata tests
+
+# Manual trigger only (Actions tab -> "plugdata tests" -> "Run workflow").
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "plugdata branch to clone and test"
+        default: "develop"
+        required: true
+      enable_asan:
+        description: "Build with AddressSanitizer"
+        type: boolean
+        default: true
+
+env:
+  PLUGDATA_REPO: https://github.com/plugdata-team/plugdata.git
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runs-on }}
+    # The end-to-end suite (incl. helpfile fuzzers) under ASAN can take a while.
+    timeout-minutes: 300
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux-x64
+            runs-on: ubuntu-24.04
+            platform: linux
+            cmake_extra: ""
+          - name: Linux-arm64
+            runs-on: ubuntu-24.04-arm
+            platform: linux
+            cmake_extra: "-DNANOVG_GLES_IMPLEMENTATION=1"
+          - name: macOS
+            runs-on: macos-latest
+            platform: macos
+            cmake_extra: ""
+          - name: Windows
+            runs-on: windows-2022
+            platform: windows
+            cmake_extra: "-DCMAKE_C_FLAGS:STRING=' /bigobj' -DCMAKE_CXX_FLAGS:STRING=' /bigobj /EHsc'"
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      # ---- Dependencies -------------------------------------------------
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt update
+          sudo DEBIAN_FRONTEND=noninteractive TZ="Europe/Amsterdam" apt install -y cmake git wget bzip2 build-essential libasound2-dev libjack-jackd2-dev curl libcurl4-openssl-dev libfreetype6-dev libx11-dev libxi-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxrandr-dev libxkbcommon-dev libxinerama-dev ccache python3 python3-pip freeglut3-dev unzip ninja-build libfontconfig-dev libwayland-dev libdecor-0-dev libegl1-mesa-dev
+
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install ninja ccache
+
+      - name: Set up MSVC environment (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja (Windows)
+        if: matrix.platform == 'windows'
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.name }}
+          max-size: 1200M
+
+      # ---- Clone plugdata (with its own submodules) ---------------------
+      - name: Clone plugdata (${{ github.event.inputs.branch }})
+        shell: bash
+        run: |
+          git clone \
+            --branch "${{ github.event.inputs.branch }}" \
+            --depth 1 \
+            --recurse-submodules --shallow-submodules \
+            "$PLUGDATA_REPO" plugdata
+          echo "Cloned $(git -C plugdata rev-parse HEAD) on branch ${{ github.event.inputs.branch }}"
+
+      # ---- Configure + build the standalone -----------------------------
+      - name: Configure
+        shell: bash
+        working-directory: plugdata
+        run: |
+          cmake -Bbuild -GNinja \
+            -DENABLE_TESTING=1 \
+            -DENABLE_ASAN=${{ github.event.inputs.enable_asan }} \
+            -DENABLE_GEM=0 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            ${{ matrix.cmake_extra }}
+
+      - name: Build standalone
+        shell: bash
+        working-directory: plugdata
+        run: cmake --build build --target plugdata_standalone
+
+      # ---- Run the test suite -------------------------------------------
+      - name: Run tests
+        shell: bash
+        run: bash "${GITHUB_WORKSPACE}/run-and-check.sh"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.name }}
+          path: test-output.log
+          if-no-files-found: ignore

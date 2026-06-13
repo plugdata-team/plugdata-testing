@@ -1,0 +1,7 @@
+# Local clone of plugdata (the CI clones it fresh; never commit it here)
+/plugdata/
+
+# Build output / logs from running the workflow locally
+build/
+*.log
+.DS_Store
