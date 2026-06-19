@@ -89,25 +89,16 @@ jobs:
 
       # ---- Configure + build the standalone -----------------------------
       - name: Configure
-        shell: bash
         working-directory: plugdata
         run: |
-          cmake -Bbuild -GNinja \
-            -DENABLE_TESTING=1 \
-            -DENABLE_ASAN=${{ github.event.inputs.enable_asan }} \
-            -DENABLE_GEM=0 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            ${{ matrix.cmake_extra }}
+          cmake -Bbuild -GNinja -DENABLE_TESTING=1 -DENABLE_ASAN=${{ github.event.inputs.enable_asan }} -DENABLE_GEM=0 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache ${{ matrix.cmake_extra }}
 
       - name: Build standalone
-        shell: bash
         working-directory: plugdata
-        run: cmake --build build --target luajit_build plugdata_standalone
+        run: cmake --build build --target plugdata_standalone
 
       # ---- Run the test suite -------------------------------------------
       - name: Run tests
-        shell: bash
         run: bash "${GITHUB_WORKSPACE}/run-and-check.sh"
 
       - name: Upload test log
