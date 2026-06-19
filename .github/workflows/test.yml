@@ -103,7 +103,7 @@ jobs:
       - name: Build standalone
         shell: bash
         working-directory: plugdata
-        run: cmake --build build --target plugdata_standalone
+        run: cmake --build build
 
       # ---- Run the test suite -------------------------------------------
       - name: Run tests
