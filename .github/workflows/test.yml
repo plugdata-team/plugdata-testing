@@ -43,7 +43,7 @@ jobs:
           - name: Windows
             runs-on: windows-2022
             platform: windows
-            cmake_extra: "-DCMAKE_C_FLAGS:STRING=' /bigobj' -DCMAKE_CXX_FLAGS:STRING=' /bigobj /EHsc'"
+            cmake_extra: "-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_FLAGS:STRING=' /bigobj' -DCMAKE_CXX_FLAGS:STRING=' /bigobj /EHsc'"
 
     steps:
       - name: Checkout this repo
