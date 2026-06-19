@@ -28,14 +28,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux-x64
+          - name: Linux
             runs-on: ubuntu-24.04
             platform: linux
             cmake_extra: ""
-          - name: Linux-arm64
-            runs-on: ubuntu-24.04-arm
-            platform: linux
-            cmake_extra: "-DNANOVG_GLES_IMPLEMENTATION=1"
           - name: macOS
             runs-on: macos-latest
             platform: macos
