@@ -103,7 +103,7 @@ jobs:
       - name: Build standalone
         shell: bash
         working-directory: plugdata
-        run: cmake --build build
+        run: cmake --build build --target luajit plugdata_standalone
 
       # ---- Run the test suite -------------------------------------------
       - name: Run tests
