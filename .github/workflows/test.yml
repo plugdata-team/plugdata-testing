@@ -96,6 +96,7 @@ jobs:
 
       # ---- Run the test suite -------------------------------------------
       - name: Run tests
+        shell: bash
         run: bash "${GITHUB_WORKSPACE}/run-and-check.sh"
 
       - name: Upload test log
