@@ -94,6 +94,37 @@ jobs:
         working-directory: plugdata
         run: cmake --build build --target plugdata_standalone
 
+      # ---- Software OpenGL for the headless Windows runner ---------------
+      # GitHub's windows runners have no GPU and only expose generic GDI
+      # OpenGL 1.1, but plugdata's NanoVG surface needs an OpenGL 3.2 context.
+      # Without one the app prints "could not initialise nvg" and the UI tests
+      # (which render through that surface) hang forever. Drop Mesa's llvmpipe
+      # opengl32.dll next to the executable so the context is created in
+      # software, and force the software path via the MESA/GALLIUM env vars.
+      - name: Install software OpenGL (Mesa llvmpipe)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pinned: pal1000/mesa-dist-win 26.2.6 dropped OpenGL software rendering from its MSVC build
+          url="https://github.com/mmozeiko/build-mesa/releases/download/26.3.0/mesa-llvmpipe-x64-26.3.0.7z"
+          echo "Downloading Mesa: $url"
+          curl -fsSL -o mesa.7z "$url"
+          7z x -y mesa.7z -omesa >/dev/null
+          gl=$(find mesa -iname opengl32.dll | head -1)
+          if [ -z "$gl" ]; then
+            echo "::error::No opengl32.dll in the Mesa archive"; find mesa -type f; exit 1
+          fi
+          echo "Mesa dlls in: $(dirname "$gl")"
+          cp "$(dirname "$gl")"/*.dll plugdata/Plugins/Standalone/
+          # Force llvmpipe and advertise a >=3.2 GL/GLSL version
+          {
+            echo "GALLIUM_DRIVER=llvmpipe"
+            echo "LIBGL_ALWAYS_SOFTWARE=1"
+            echo "MESA_GL_VERSION_OVERRIDE=4.5"
+            echo "MESA_GLSL_VERSION_OVERRIDE=450"
+          } >> "$GITHUB_ENV"
+
       # ---- Run the test suite -------------------------------------------
       - name: Run tests
         shell: bash
