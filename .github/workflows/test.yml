@@ -21,8 +21,6 @@ jobs:
   test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
-    # The end-to-end suite (incl. helpfile fuzzers) under ASAN can take a while.
-    timeout-minutes: 300
 
     strategy:
       fail-fast: false
