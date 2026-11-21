@@ -41,6 +41,44 @@ jobs:
             cmake_extra: "-DENABLE_SFIZZ=0 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_FLAGS:STRING=' /bigobj' -DCMAKE_CXX_FLAGS:STRING=' /bigobj /EHsc'"
 
     steps:
+      # Disable Windows Defender, since it horribly slows down file IO
+      - name: Disable Windows Defender scanning (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $prefs = [ordered]@{
+            DisableRealtimeMonitoring = $true
+            DisableBehaviorMonitoring = $true
+            DisableIOAVProtection     = $true   # scan of downloaded files
+            DisableScriptScanning     = $true
+            DisableArchiveScanning    = $true
+            DisableBlockAtFirstSeen   = $true   # cloud check on each new exe
+            MAPSReporting             = 0       # no cloud lookups
+            SubmitSamplesConsent      = 2       # never send samples
+            DisableCatchupQuickScan   = $true
+            DisableCatchupFullScan    = $true
+            ScanScheduleDay           = 8       # never run scheduled scans
+          }
+          foreach ($name in $prefs.Keys) {
+            $p = @{ $name = $prefs[$name]; ErrorAction = 'Stop' }
+            try { Set-MpPreference @p }
+            catch { Write-Host "::warning::Set-MpPreference -$name failed: $($_.Exception.Message)" }
+          }
+
+          $roots = (Get-PSDrive -PSProvider FileSystem | Where-Object Root -Match '^[A-Za-z]:\\$').Root
+          try {
+            Add-MpPreference -ExclusionPath $roots -ErrorAction Stop
+          } catch {
+            Write-Host "::warning::Add-MpPreference -ExclusionPath failed: $($_.Exception.Message)"
+          }
+
+          try {
+            Get-MpComputerStatus | Format-List AMRunningMode, RealTimeProtectionEnabled, OnAccessProtectionEnabled, BehaviorMonitorEnabled, IoavProtectionEnabled
+            Write-Host "Excluded paths: $((Get-MpPreference).ExclusionPath -join ', ')"
+          } catch {
+            Write-Host "Defender status unavailable: $($_.Exception.Message)"
+          }
+
       - name: Checkout this repo
         uses: actions/checkout@v4
 
