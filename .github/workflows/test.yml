@@ -12,6 +12,10 @@ on:
         description: "Build with AddressSanitizer"
         type: boolean
         default: true
+      use_clang_cl:
+        description: "Use clang-cl instead of cl on Windows"
+        type: boolean
+        default: false
 
 env:
   PLUGDATA_REPO: https://github.com/plugdata-team/plugdata.git
@@ -34,11 +38,11 @@ jobs:
             runs-on: macos-latest
             platform: macos
             cmake_extra: ""
-          - name: Windows
+          - name: ${{ inputs.use_clang_cl && 'Windows (clang-cl)' || 'Windows' }}
             runs-on: windows-2022
             platform: windows
             # Windows runs without Sfizz because that breaks std::string and std::vector annotations for ASAN
-            cmake_extra: "-DENABLE_SFIZZ=0 -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_FLAGS:STRING=' /bigobj' -DCMAKE_CXX_FLAGS:STRING=' /bigobj /EHsc'"
+            cmake_extra: "-DENABLE_SFIZZ=0 -DCMAKE_C_COMPILER=${{ inputs.use_clang_cl && 'clang-cl' || 'cl' }} -DCMAKE_CXX_COMPILER=${{ inputs.use_clang_cl && 'clang-cl' || 'cl' }} -DCMAKE_C_FLAGS:STRING=' /bigobj' -DCMAKE_CXX_FLAGS:STRING=' /bigobj /EHsc'"
 
     steps:
       # Disable Windows Defender, since it horribly slows down file IO
@@ -98,6 +102,34 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      - name: Install clang-cl (Windows)
+        if: matrix.platform == 'windows' && inputs.use_clang_cl
+        shell: pwsh
+        run: |
+          if (-not (Get-Command clang-cl -ErrorAction SilentlyContinue)) {
+            choco install llvm -y --no-progress
+            $llvm = "$env:ProgramFiles\LLVM\bin"
+            $env:PATH = "$llvm;$env:PATH"
+            $llvm >> $env:GITHUB_PATH
+          }
+          clang-cl --version
+
+      # CMake calls the linker directly, so it misses the ASan runtime libs the clang-cl driver would add.
+      # Ask the driver for them, and put the runtime dir (with its ASan dll) on PATH ahead of MSVC's.
+      - name: Set up clang-cl ASan runtime (Windows)
+        if: matrix.platform == 'windows' && inputs.use_clang_cl && inputs.enable_asan
+        shell: pwsh
+        run: |
+          $probe = "$env:RUNNER_TEMP\asan-probe.cpp"
+          New-Item $probe -Force | Out-Null
+          $cmd = "$(clang-cl -### -fsanitize=address /MT $probe 2>&1 | Select-Object -Last 1)"
+          $libs = @([regex]::Matches($cmd, '"([^"]*clang_rt\.asan[^"]*)"') | ForEach-Object { $_.Groups[1].Value -replace '\\\\', '\' })
+          if (-not $libs) { Write-Host "::error::No ASan libs in clang-cl link line: $cmd"; exit 1 }
+          $link = ($libs | ForEach-Object { "`"$_`"" }) -join ' '
+          Write-Host "LINK=$link"
+          "LINK=$link" >> $env:GITHUB_ENV
+          Split-Path ($libs[0] -replace '^-wholearchive:') >> $env:GITHUB_PATH
 
       - name: Install Ninja (Windows)
         if: matrix.platform == 'windows'
