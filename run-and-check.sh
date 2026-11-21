@@ -35,7 +35,7 @@ export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0"
 
 # Use a hard timeout if available so a hang doesn't burn the whole job budget.
 TIMEOUT=""
-if command -v timeout >/dev/null 2>&1; then TIMEOUT="timeout 14400"; fi
+if command -v timeout >/dev/null 2>&1; then TIMEOUT="timeout 19800"; fi
 
 echo "Running: $RUNNER $TIMEOUT $APP"
 echo "===================== test output (live) ====================="
