@@ -16,6 +16,10 @@ on:
         description: "Use clang-cl instead of cl on Windows"
         type: boolean
         default: false
+      run_vst3:
+        description: "Run the VST3 tests (the whole suite runs again inside the VST3)"
+        type: boolean
+        default: true
 
 env:
   PLUGDATA_REPO: https://github.com/plugdata-team/plugdata.git
@@ -196,6 +200,8 @@ jobs:
       # ---- Run the test suite -------------------------------------------
       - name: Run tests
         shell: bash
+        env:
+          PLUGDATA_TEST_SKIP_VST3: ${{ inputs.run_vst3 && '0' || '1' }}
         run: bash "${GITHUB_WORKSPACE}/run-and-check.sh"
 
       - name: Upload test log

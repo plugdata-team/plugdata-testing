@@ -25,7 +25,9 @@ does the following:
 2. **Configures & builds** the standalone target with
    `-DENABLE_TESTING=1 -DENABLE_ASAN=1` (ccache-accelerated).
 3. **Runs** the standalone. When built with `ENABLE_TESTING`, plugdata runs its
-   whole unit/integration suite at startup and quits when finished.
+   whole unit/integration suite at startup and quits when finished. It then
+   hosts the VST3 and runs the suite again inside it; untick **Run the VST3
+   tests** to skip that and roughly halve the run time.
 4. **Checks the result** ([`scripts/run-and-check.sh`](scripts/run-and-check.sh)):
    the job fails if a sanitizer reports an error, if the JUCE `UnitTestRunner`
    prints a failure, or if the run hangs/crashes. The full output is uploaded as
